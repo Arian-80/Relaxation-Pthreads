@@ -61,7 +61,7 @@ void perform_relaxation_parallel(struct RelaxationStruct* auxStruct, int start, 
      * Barrier to ensure all threads have completed their computation before..-
      * -.. the shared, original 'array' is manipulated.
      */
-//    pthread_barrier_wait(&auxStruct->queueBarrier);
+    pthread_barrier_wait(&auxStruct->queueBarrier);
 
 }
 
@@ -84,7 +84,7 @@ double** perform_relaxation(double** array, int size, int threads, double precis
         threadStruct.jobAvailable = false; // Initially no job is available.
 
         pthread_t* threadsArray = (pthread_t*) malloc(threads * sizeof(pthread_t));
-        if (threadsArray == NULL) return NULL;
+        if (!threadsArray) return NULL;
         // Create threads and add them to the thread pool.
         for (int i = 0; i < threads; i++) {
             if (i < remainder) { // Deal with remainders using thread ID
@@ -99,7 +99,11 @@ double** perform_relaxation(double** array, int size, int threads, double precis
             threadStruct.start++;
             threadStruct.end++;
             if (pthread_create(&threadsArray[i], NULL, (void*) thread_pool_manager,
-                               &threadStruct)) return NULL; // Ensure that threads are created.
+                               &threadStruct)) { // Ensure that threads are created.
+                for (int j = 0; j < i; j++) pthread_join(threadsArray[j], NULL);
+                free(threadsArray);
+                return NULL;
+            }
             // Ensure thread has stored its unique range of values to compute.
             pthread_barrier_wait(&threadStruct.auxStruct.signalBarrier);
         }
@@ -118,18 +122,17 @@ double** perform_relaxation(double** array, int size, int threads, double precis
             pthread_barrier_wait(&threadStruct.auxStruct.queueBarrier);
             threadStruct.jobAvailable = false;
             // Wait for all threads to finish working on the shared data.
-//            pthread_barrier_wait(&threadStruct.auxStruct.queueBarrier);
+            pthread_barrier_wait(&threadStruct.auxStruct.queueBarrier);
         }
         // Solution has been obtained, threads can be destroyed now.
         threadStruct.endOfProgram = true;
 
         // Ensure all threads are at the end of their function before advancing.
-        for (unsigned int i = 0; i < threads; i++) pthread_join(threadsArray[i], NULL);
+        for (int i = 0; i < threads; i++) pthread_join(threadsArray[i], NULL);
         free(threadsArray);
         // Destroy used primitives.
         pthread_barrier_destroy(&threadStruct.auxStruct.signalBarrier);
         pthread_barrier_destroy(&threadStruct.auxStruct.queueBarrier);
-
     }
     else { // Sequential
         bool changed = true;
@@ -152,11 +155,23 @@ double** perform_relaxation(double** array, int size, int threads, double precis
             }
         }
     }
+    /*
+     * Correctness testing:
+     * Test different values against the average of their neighbours
+     * If the values match, then we can assume convergence has been reached
+     * Hence, the program functions correctly.
+     */
+        // Value to check must not be part of the outer values and must be in range.
+        int i = 4; int j = 6;
+        printf("Value to test: %.3lf\tAbove: %.3lf\tBelow: %.3lf\tLeft: %.3lf\t"
+                   "Right: %.3lf\n", array[i][j],
+                   array[i-1][j], array[i+1][j],
+                   array[i][j-1], array[i][j+1]);
     return array;
 }
 
 int main () {
-    int size = 10; // Size
+    int size = 1000; // Size
     // Create original array to pass into the function.
     double** newArray = malloc(size * sizeof(double*));
     if (newArray == NULL) return -1;
@@ -186,13 +201,13 @@ int main () {
 
     // Script used for testing.
     // FILE* file = fopen("results.out", "a");
-     for (unsigned int i = 0; i < size; i++) {
-         for (unsigned int j = 0; j < size; j++) {
-             printf("%.3f\t", newArray[i][j]);
+//     for (unsigned int i = 0; i < size; i++) {
+//         for (unsigned int j = 0; j < size; j++) {
+//             printf("%.3f\t", newArray[i][j]);
             // fprintf(file, "%.3f,", newArray[i][j]);
-         }
-         printf("\n");
-     }
+//         }
+//         printf("\n");
+//     }
     // fprintf(file, "\n");
 
     for (unsigned int i = 0; i < size; i++) free(newArray[i]);
