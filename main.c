@@ -61,6 +61,7 @@ void perform_relaxation_parallel(struct RelaxationStruct* auxStruct, int start, 
      * Barrier to ensure all threads have completed their computation before..-
      * -.. the shared, original 'array' is manipulated.
      */
+//    pthread_barrier_wait(&auxStruct->queueBarrier);
 
 }
 
@@ -72,7 +73,7 @@ double** perform_relaxation(double** array, int size, int threads, double precis
         if (threads > (size-2)/2) threads = (size-2)/2;
 
         /* 'Signal' barrier used to ensure shared resources are not altered
-         * before each thread stores them.
+         * before each thread passes a certain point.
          */
         struct ThreadStruct threadStruct;
         pthread_barrier_init(&threadStruct.auxStruct.signalBarrier, NULL, 2);
@@ -98,7 +99,7 @@ double** perform_relaxation(double** array, int size, int threads, double precis
             threadStruct.start++;
             threadStruct.end++;
             if (pthread_create(&threadsArray[i], NULL, (void*) thread_pool_manager,
-                               &threadStruct)) return NULL;
+                               &threadStruct)) return NULL; // Ensure that threads are created.
             // Ensure thread has stored its unique range of values to compute.
             pthread_barrier_wait(&threadStruct.auxStruct.signalBarrier);
         }
@@ -117,6 +118,7 @@ double** perform_relaxation(double** array, int size, int threads, double precis
             pthread_barrier_wait(&threadStruct.auxStruct.queueBarrier);
             threadStruct.jobAvailable = false;
             // Wait for all threads to finish working on the shared data.
+//            pthread_barrier_wait(&threadStruct.auxStruct.queueBarrier);
         }
         // Solution has been obtained, threads can be destroyed now.
         threadStruct.endOfProgram = true;
@@ -127,19 +129,7 @@ double** perform_relaxation(double** array, int size, int threads, double precis
         // Destroy used primitives.
         pthread_barrier_destroy(&threadStruct.auxStruct.signalBarrier);
         pthread_barrier_destroy(&threadStruct.auxStruct.queueBarrier);
-        /*
-         * Correctness testing:
-         * Test different values against the average of their neighbours
-         * If the values match, then we can assume convergence has been reached
-         * Hence, the program functions correctly.
-         */
-        // Value to check must not be part of the outer values and must be in range.
-//        int i, j;
-//        i = 1; j = 6;
-//        printf("Value to test: %.3lf\tAbove: %.3lf\tBelow: %.3lf\tLeft: %.3lf\t"
-//                   "Right: %.3lf\n", array[i][j],
-//                   array[i-1][j], array[i+1][j],
-//                   array[i][j-1], array[i][j+1]);
+
     }
     else { // Sequential
         bool changed = true;
@@ -150,7 +140,7 @@ double** perform_relaxation(double** array, int size, int threads, double precis
             // Compute the average for the same set range of elements in all rows.
             for (unsigned int i = 1; i < size-1; i++) {
                 for (unsigned int j = 1; j < size-1; j++) {
-                    // Take average .
+                    // Take average and round to specified precision.
                     currValue = array[i][j];
                     array[i][j] = (array[i-1][j] +
                     array[i+1][j] + array[i][j-1] + array[i][j+1])/4;
