@@ -38,7 +38,8 @@ void thread_pool_manager(struct ThreadStruct threadStruct) { // Thread pool
 }
 
 
-void perform_relaxation_parallel(struct RelaxationStruct* auxStruct, int start, int end) { // Relaxation computation
+void perform_relaxation_parallel(struct RelaxationStruct* auxStruct,
+        int start, int end) { // Relaxation computation
     // This function is executed by each thread in parallel with unique ranges.
     int size = auxStruct->size;
     double** array = auxStruct->array;
@@ -162,16 +163,17 @@ double** perform_relaxation(double** array, int size, int threads, double precis
      * Hence, the program functions correctly.
      */
         // Value to check must not be part of the outer values and must be in range.
-        int i = 4; int j = 6;
-        printf("Value to test: %.3lf\tAbove: %.3lf\tBelow: %.3lf\tLeft: %.3lf\t"
-                   "Right: %.3lf\n", array[i][j],
-                   array[i-1][j], array[i+1][j],
-                   array[i][j-1], array[i][j+1]);
+    int i = 23153/2000; int j = 23153%2000;
+    printf("Value to test: %.3lf\tAbove: %.3lf\tBelow: %.3lf\tLeft: %.3lf\t"
+               "Right: %.3lf\n", array[i][j],
+               array[i-1][j], array[i+1][j],
+               array[i][j-1], array[i][j+1]);
+    printf("Expected value: %.3lf\n", (array[i][j+1] + array[i][j-1] + array[i+1][j] + array[i-1][j]) / 4);
     return array;
 }
 
 int main () {
-    int size = 1000; // Size
+    int size = 5000; // Size
     // Create original array to pass into the function.
     double** newArray = malloc(size * sizeof(double*));
     if (newArray == NULL) return -1;
@@ -209,7 +211,8 @@ int main () {
 //         printf("\n");
 //     }
     // fprintf(file, "\n");
-
+    FILE* f = fopen("times.txt", "a");
+    fprintf(f, "%g,", difftime(end, start));
     for (unsigned int i = 0; i < size; i++) free(newArray[i]);
     free(newArray);
     return 0;
